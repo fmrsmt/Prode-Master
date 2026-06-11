@@ -30,8 +30,8 @@ service cloud.firestore {
         && (data.keys().hasAny(['oddsData']) == false || data.oddsData is string);
     }
 
-    match /users/{userId}/data/{docId} {
-      allow read, write: if isSignedIn() && userId == request.auth.uid;
+    match /public/{docId} {
+      allow read, write: if true;
     }
   }
 }
