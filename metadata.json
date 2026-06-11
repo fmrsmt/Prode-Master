@@ -1,0 +1,6 @@
+{
+  "name": "Prode Analytics Master",
+  "description": "Una plataforma matemática para gestionar y optimizar predicciones del prode mundial usando esperanza estadística y múltiples casas de apuestas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

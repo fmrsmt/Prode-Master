@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "UserState": {
+      "title": "User State",
+      "description": "Represents the user's localized state containing prodes, scores, and odds.",
+      "type": "object",
+      "properties": {
+        "prodes": {
+          "type": "string",
+          "description": "JSON stringified prodes array"
+        },
+        "actualScores": {
+          "type": "string",
+          "description": "JSON stringified actual scores object"
+        },
+        "oddsData": {
+          "type": "string",
+          "description": "JSON stringified odds data object"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns this data."
+        }
+      },
+      "required": ["ownerId"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/data/{docId}": {
+      "schema": {
+        "$ref": "#/entities/UserState"
+      },
+      "description": "Stores user-specific app state."
+    }
+  }
+}
