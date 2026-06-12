@@ -105,10 +105,14 @@ export default function App() {
     INITIAL_FIXTURE.forEach(m => {
         const pred = activeProde.predictions[m.id];
         const actual = actualScores[m.id];
-        if (pred && actual) {
-            const pts = calculateMatchPoints(actual.a, actual.b, pred.a, pred.b);
+        if (pred && actual && actual.a !== null && actual.b !== null && pred.a !== null && pred.b !== null) {
+            const exactPoints = activeProde.config?.exactPoints ?? 3;
+            const partialPoints = activeProde.config?.partialPoints ?? 1;
+            const multiplier = activeProde.multipliers?.[m.id] ?? 1;
+            
+            const pts = calculateMatchPoints(actual.a, actual.b, pred.a, pred.b, exactPoints, partialPoints, multiplier);
             totalPoints += pts;
-            if (pts === 3) hitsExact++;
+            if (pts === exactPoints * multiplier && pts > 0) hitsExact++;
         }
     });
   }
@@ -118,6 +122,20 @@ export default function App() {
     setProdes(prodes.map(p => {
         if (p.id !== activeProde.id) return p;
         return { ...p, predictions: { ...p.predictions, [matchId]: { a, b } } };
+    }));
+  };
+
+  const handleToggleMultiplier = (matchId: string) => {
+    if (!activeProde) return;
+    setProdes(prodes.map(p => {
+        if (p.id !== activeProde.id) return p;
+        const multipliers = { ...(p.multipliers || {}) };
+        if (multipliers[matchId] === 2) {
+          delete multipliers[matchId];
+        } else {
+          multipliers[matchId] = 2;
+        }
+        return { ...p, multipliers };
     }));
   };
 
@@ -255,7 +273,7 @@ export default function App() {
         {(activeTabId === 'RESULTS' || activeProde) && (
             <div className="flex flex-col gap-6">
               {activeProde && (
-                <div className="flex items-center gap-3 w-full max-w-sm">
+                <div className="flex flex-col gap-3 w-full max-w-sm mb-4">
                     <input 
                       type="text" 
                       value={activeProde.name}
@@ -265,6 +283,37 @@ export default function App() {
                       className="w-full px-4 py-2 border-b-2 border-slate-200 hover:border-slate-300 focus:border-blue-500 bg-transparent outline-none text-xl font-bold text-slate-800 transition-colors"
                       placeholder="Nombre del Prode"
                     />
+                    <div className="flex flex-wrap items-center gap-4 px-4">
+                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                           Puntos Exacto: 
+                           <input type="number" min="0" value={activeProde.config?.exactPoints ?? 3} onChange={(e) => {
+                               const val = parseInt(e.target.value) || 0;
+                               setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), exactPoints: val } } : p));
+                           }} className="w-14 text-center border border-slate-200 rounded-md py-1 bg-white focus:outline-none focus:border-blue-500 text-slate-800" />
+                        </label>
+                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                           Puntos Parcial: 
+                           <input type="number" min="0" value={activeProde.config?.partialPoints ?? 1} onChange={(e) => {
+                               const val = parseInt(e.target.value) || 0;
+                               setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), partialPoints: val } } : p));
+                           }} className="w-14 text-center border border-slate-200 rounded-md py-1 bg-white focus:outline-none focus:border-blue-500 text-slate-800" />
+                        </label>
+                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                           Riesgo EV: 
+                           <select 
+                               value={activeProde.config?.riskMode || 'normal'}
+                               onChange={(e) => {
+                                   const val = e.target.value as 'conservative' | 'normal' | 'risky';
+                                   setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), riskMode: val } } : p));
+                               }}
+                               className="border border-slate-200 rounded-md py-1 px-2 bg-white focus:outline-none focus:border-blue-500 text-slate-800"
+                           >
+                               <option value="conservative">Conservador</option>
+                               <option value="normal">Normal</option>
+                               <option value="risky">Arriesgado</option>
+                           </select>
+                        </label>
+                    </div>
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -285,6 +334,11 @@ export default function App() {
                           onUpdatePrediction={(a, b) => handleUpdatePrediction(match.id, a, b)}
                           onUpdateActual={(a, b) => handleUpdateActual(match.id, a, b)}
                           mode={activeTabId === 'RESULTS' ? 'results' : 'prode'}
+                          exactPoints={activeProde?.config?.exactPoints ?? 3}
+                          partialPoints={activeProde?.config?.partialPoints ?? 1}
+                          multiplier={activeProde?.multipliers?.[match.id] ?? 1}
+                          onToggleMultiplier={() => handleToggleMultiplier(match.id)}
+                          riskMode={activeProde?.config?.riskMode || 'normal'}
                       />
                   );
               })}

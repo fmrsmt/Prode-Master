@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { Target, TrendingUp, DollarSign, Upload, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { Target, TrendingUp, DollarSign, Upload, Loader2, AlertCircle, BarChart2 } from 'lucide-react';
 import { Match, HouseOdds } from '../types';
 import OddsModal from './OddsModal';
-import { map1X2ToExactOdds } from '../utils';
+import { calculateTopPredictions } from '../utils';
 
 type Props = {
   matches: Match[];
@@ -106,7 +106,7 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [matches, oddsData, onBulkUpdateOdds]);
+  }, [matches, oddsData, onBulkUpdateOdds, houseNameInput]);
 
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -127,6 +127,39 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
       await processFile(file);
     }
   };
+
+  // Calculate Global EV Rankings
+  const globalEVRankings = useMemo(() => {
+    interface GlobalEVResult {
+      match: Match;
+      scoreA: number;
+      scoreB: number;
+      expectedPoints: string;
+      exactProb: string;
+    }
+
+    const allEVList: GlobalEVResult[] = [];
+    matches.forEach(m => {
+      const houses = oddsData[m.id] || [];
+      if (houses.length > 0) {
+        // limit = 0 to get all calculated predictions for the match, or just 10, doesn't matter too much, we just need top results
+        // Let's get top 5 per match and then sort globally
+        const top = calculateTopPredictions(houses, undefined, 5);
+        top.forEach(t => {
+          allEVList.push({
+            match: m,
+            scoreA: t.scoreA,
+            scoreB: t.scoreB,
+            expectedPoints: t.expectedPoints,
+            exactProb: t.probs.exact
+          });
+        });
+      }
+    });
+
+    allEVList.sort((a, b) => parseFloat(b.expectedPoints) - parseFloat(a.expectedPoints));
+    return allEVList.slice(0, 20); // Top 20 best global results
+  }, [matches, oddsData]);
 
   return (
     <div 
@@ -208,6 +241,51 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
           })}
         </div>
       </div>
+
+      {globalEVRankings.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mt-2">
+          <div className="p-6 border-b border-slate-100 bg-slate-50">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1">
+              <BarChart2 className="w-5 h-5 text-emerald-500" /> Ranking Global de EV
+            </h3>
+            <p className="text-sm text-slate-500">
+              Los mejores resultados para pronosticar considerando todos los partidos con cuotas cargadas, ordenados por maximización de puntaje en el prode.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-white border-b border-slate-100">
+                <tr>
+                  <th className="py-4 px-6 font-bold text-slate-400 text-xs uppercase tracking-widest min-w-[200px]">Partido</th>
+                  <th className="py-4 px-6 font-bold text-slate-400 text-xs uppercase tracking-widest text-center">Resultado</th>
+                  <th className="py-4 px-6 font-bold text-slate-400 text-xs uppercase tracking-widest text-center">Prob. Exacto</th>
+                  <th className="py-4 px-6 font-bold text-emerald-600 text-xs uppercase tracking-widest text-right">EV (Esperanza)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {globalEVRankings.map((rev, idx) => (
+                  <tr key={`${rev.match.id}-${rev.scoreA}-${rev.scoreB}`} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-6 text-sm font-bold text-slate-700">
+                      {rev.match.teamA.substring(0, 3).toUpperCase()} <span className="text-slate-400 font-medium">vs</span> {rev.match.teamB.substring(0, 3).toUpperCase()}
+                    </td>
+                    <td className="py-3 px-6 text-center">
+                      <div className="inline-flex items-center justify-center bg-slate-100 border border-slate-200 px-3 py-1 rounded-md min-w-[70px]">
+                        <span className="font-mono font-bold text-slate-800">{rev.scoreA} - {rev.scoreB}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-6 text-center">
+                      <span className="font-mono text-slate-500 font-medium">{rev.exactProb}%</span>
+                    </td>
+                    <td className="py-3 px-6 text-right">
+                      <span className="text-lg font-black font-mono text-emerald-600">+{rev.expectedPoints} pt</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {editingMatch && (
         <OddsModal 

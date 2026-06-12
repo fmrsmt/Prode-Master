@@ -18,11 +18,15 @@ export default function ProdeComparison({ prodes, actualScores, matches }: Props
     matches.forEach(m => {
         const pred = prode.predictions[m.id];
         const actual = actualScores[m.id];
-        if (pred && actual) {
-            const pt = calculateMatchPoints(actual.a, actual.b, pred.a, pred.b);
+        if (pred && actual && actual.a !== null && actual.b !== null && pred.a !== null && pred.b !== null) {
+            const exactPoints = prode.config?.exactPoints ?? 3;
+            const partialPoints = prode.config?.partialPoints ?? 1;
+            const multiplier = prode.multipliers?.[m.id] ?? 1;
+
+            const pt = calculateMatchPoints(actual.a, actual.b, pred.a, pred.b, exactPoints, partialPoints, multiplier);
             pts += pt;
-            if (pt === 3) exacts++;
-            if (pt === 1) partials++;
+            if (pt === exactPoints * multiplier && pt > 0) exacts++;
+            else if (pt === partialPoints * multiplier && pt > 0) partials++;
         }
     });
 
@@ -133,14 +137,21 @@ export default function ProdeComparison({ prodes, actualScores, matches }: Props
                       const pB = hasPred ? pred.b : '-';
                       
                       let pts = 0;
+                      let exactPoints = 3;
+                      let partialPoints = 1;
+                      let multiplier = 1;
+
                       if (hasActual && hasPred) {
-                        pts = calculateMatchPoints(actual.a, actual.b, pred.a, pred.b);
+                        exactPoints = prode.config?.exactPoints ?? 3;
+                        partialPoints = prode.config?.partialPoints ?? 1;
+                        multiplier = prode.multipliers?.[m.id] ?? 1;
+                        pts = calculateMatchPoints(actual.a, actual.b, pred.a, pred.b, exactPoints, partialPoints, multiplier);
                       }
 
                       let bgClass = "bg-white border-slate-100 text-slate-400";
                       if (hasActual && hasPred) {
-                        if (pts === 3) bgClass = "bg-emerald-100 border-emerald-200 text-emerald-800";
-                        else if (pts === 1) bgClass = "bg-amber-100 border-amber-200 text-amber-800";
+                        if (pts === exactPoints * multiplier && pts > 0) bgClass = "bg-emerald-100 border-emerald-200 text-emerald-800";
+                        else if (pts === partialPoints * multiplier && pts > 0) bgClass = "bg-amber-100 border-amber-200 text-amber-800";
                         else bgClass = "bg-slate-50 border-slate-200 text-slate-500";
                       } else if (hasPred) {
                         bgClass = "bg-white border-slate-200 text-slate-700";
@@ -148,8 +159,9 @@ export default function ProdeComparison({ prodes, actualScores, matches }: Props
 
                       return (
                         <td key={prode.id} className="py-3 px-6 text-center">
-                          <div className={`inline-flex items-center justify-center border px-3 py-1 rounded-md min-w-[80px] transition-colors ${bgClass}`}>
+                          <div className={`inline-flex flex-col items-center justify-center border px-3 py-1 rounded-md min-w-[80px] transition-colors ${multiplier === 2 && !hasActual ? 'ring-1 ring-amber-300' : ''} ${bgClass}`}>
                             <span className="font-mono font-bold">{pA} - {pB}</span>
+                            {multiplier === 2 && <span className="text-[9px] font-bold uppercase mt-0.5 opacity-60">x2</span>}
                           </div>
                         </td>
                       );

@@ -6,7 +6,14 @@ export const COMMON_SCORES = [
   {a: 0, b: 1}, {a: 0, b: 2}, {a: 1, b: 2}, {a: 0, b: 3}, {a: 1, b: 3}, {a: 2, b: 3}
 ];
 
-export function calculateTopPredictions(houses: HouseOdds[], houseIdFilter?: string) {
+export function calculateTopPredictions(
+  houses: HouseOdds[], 
+  houseIdFilter?: string, 
+  limit: number = 3,
+  exactPoints: number = 3,
+  partialPoints: number = 1,
+  riskMode: 'conservative' | 'normal' | 'risky' = 'normal'
+) {
   const activeHouses = houseIdFilter && houseIdFilter !== 'ALL'
     ? houses.filter(h => h.id === houseIdFilter)
     : houses;
@@ -64,26 +71,45 @@ export function calculateTopPredictions(houses: HouseOdds[], houseIdFilter?: str
     });
   }
 
-  const evResults: { scoreA: number, scoreB: number, ev: number, exactProb: number }[] = [];
+  const evResults: { scoreA: number, scoreB: number, ev: number, originalEv: number, exactProb: number }[] = [];
 
   COMMON_SCORES.forEach(({a: pA, b: pB}) => {
     const keyP = `${pA}-${pB}`;
     const pExact = avgProbs[keyP] || 0;
     const pOutcome = pA > pB ? totalProbHome : pA === pB ? totalProbDraw : totalProbAway;
 
-    // EV = 3 puntos (acierto exacto) + 1 punto (acierto de resultado sin ser exacto)
-    // E(XP) = 3 * pExact + 1 * (pOutcome - pExact)
-    // E(XP) = 2 * pExact + pOutcome
-    const ev = (2 * pExact) + pOutcome;
+    // EV = exact puntos (acierto exacto) + partial puntos (acierto de resultado sin ser exacto)
+    // E(XP) = (exactPoints - partialPoints) * pExact + partialPoints * pOutcome
+    const ev = (exactPoints - partialPoints) * pExact + partialPoints * pOutcome;
+    
+    let utility = ev;
+    
+    if (riskMode === 'conservative') {
+        const varExact = pExact * Math.pow(exactPoints - ev, 2);
+        const varPartial = Math.max(0, pOutcome - pExact) * Math.pow(partialPoints - ev, 2);
+        const varZero = Math.max(0, 1 - pOutcome) * Math.pow(0 - ev, 2);
+        const stdev = Math.sqrt(varExact + varPartial + varZero);
+        // Penalizamos varianza
+        utility = ev - 0.2 * stdev;
+    } else if (riskMode === 'risky') {
+        const varExact = pExact * Math.pow(exactPoints - ev, 2);
+        const varPartial = Math.max(0, pOutcome - pExact) * Math.pow(partialPoints - ev, 2);
+        const varZero = Math.max(0, 1 - pOutcome) * Math.pow(0 - ev, 2);
+        const stdev = Math.sqrt(varExact + varPartial + varZero);
+        // Premiamos varianza y factor sorpresa
+        utility = ev + 0.3 * stdev;
+    }
 
-    if (ev > 0) {
-        evResults.push({ scoreA: pA, scoreB: pB, ev, exactProb: pExact });
+    if (ev > 0 || utility > 0) {
+        evResults.push({ scoreA: pA, scoreB: pB, ev: utility, originalEv: ev, exactProb: pExact });
     }
   });
 
   evResults.sort((x, y) => y.ev - x.ev);
 
-  return evResults.slice(0, 3).map(res => ({
+  let sliced = limit > 0 ? evResults.slice(0, limit) : evResults;
+
+  return sliced.map(res => ({
     scoreA: res.scoreA,
     scoreB: res.scoreB,
     expectedPoints: res.ev.toFixed(3),
@@ -146,9 +172,17 @@ export function map1X2ToExactOdds(odds1: number, oddsX: number, odds2: number): 
   return exactScores;
 }
 
-export function calculateMatchPoints(actualA: number | null, actualB: number | null, predA: number | null, predB: number | null) {
+export function calculateMatchPoints(
+  actualA: number | null, 
+  actualB: number | null, 
+  predA: number | null, 
+  predB: number | null,
+  exactPoints: number = 3,
+  partialPoints: number = 1,
+  multiplier: number = 1
+) {
   if (actualA === null || actualB === null || predA === null || predB === null) return 0;
-  if (actualA === predA && actualB === predB) return 3; // EXACT RESULT (3 points)
+  if (actualA === predA && actualB === predB) return exactPoints * multiplier;
   
   const actualDiff = actualA - actualB;
   const predDiff = predA - predB;
@@ -156,6 +190,6 @@ export function calculateMatchPoints(actualA: number | null, actualB: number | n
   const actualOutcome = actualDiff > 0 ? 1 : actualDiff < 0 ? -1 : 0;
   const predOutcome = predDiff > 0 ? 1 : predDiff < 0 ? -1 : 0;
   
-  if (actualOutcome === predOutcome) return 1; // CORRECT OUTCOME W/D/L (1 point)
-  return 0; // ZERO POINTS
+  if (actualOutcome === predOutcome) return partialPoints * multiplier;
+  return 0;
 }

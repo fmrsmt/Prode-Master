@@ -15,12 +15,22 @@ type Props = {
   onUpdateActual?: (a: number | null, b: number | null) => void;
   onUpdatePrediction?: (a: number | null, b: number | null) => void;
   mode: 'prode' | 'results';
+  exactPoints?: number;
+  partialPoints?: number;
+  multiplier?: number;
+  onToggleMultiplier?: () => void;
+  riskMode?: 'conservative' | 'normal' | 'risky';
 };
 
-export default function MatchCard({ match, actualScoreA, actualScoreB, predictedScoreA, predictedScoreB, oddsData, onUpdateActual, onUpdatePrediction, mode }: Props) {
+export default function MatchCard({ 
+  match, actualScoreA, actualScoreB, predictedScoreA, predictedScoreB, 
+  oddsData, onUpdateActual, onUpdatePrediction, mode, 
+  exactPoints = 3, partialPoints = 1, multiplier = 1, onToggleMultiplier,
+  riskMode = 'normal'
+}: Props) {
   const [selectedHouse, setSelectedHouse] = useState<string>('ALL');
 
-  const points = calculateMatchPoints(actualScoreA, actualScoreB, predictedScoreA, predictedScoreB);
+  const points = calculateMatchPoints(actualScoreA, actualScoreB, predictedScoreA, predictedScoreB, exactPoints, partialPoints, multiplier);
   const hasResult = actualScoreA !== null && actualScoreB !== null;
 
   const parseScore = (val: string) => {
@@ -30,14 +40,24 @@ export default function MatchCard({ match, actualScoreA, actualScoreB, predicted
   };
 
   const hasOdds = oddsData && oddsData.length > 0;
-  const topPredictions = hasOdds ? calculateTopPredictions(oddsData, selectedHouse) : [];
+  const topPredictions = hasOdds ? calculateTopPredictions(oddsData, selectedHouse, 3, exactPoints, partialPoints, riskMode) : [];
 
   return (
-    <div className="bg-white border border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md transition-all rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden group">
+    <div className={`bg-white border hover:border-blue-300 shadow-sm hover:shadow-md transition-all rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden group ${multiplier === 2 ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
       {hasResult && mode === 'prode' && (
-        <div className={`absolute top-0 right-0 px-4 py-1.5 text-xs font-bold rounded-bl-xl ${points === 3 ? 'bg-blue-100 text-blue-700' : points === 1 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+        <div className={`absolute top-0 right-0 px-4 py-1.5 text-xs font-bold rounded-bl-xl ${points === exactPoints * multiplier ? 'bg-blue-100 text-blue-700' : points === partialPoints * multiplier ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
           +{points} pts
         </div>
+      )}
+
+      {mode === 'prode' && onToggleMultiplier && (
+        <button 
+          onClick={onToggleMultiplier}
+          className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md border transition-colors ${multiplier === 2 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'}`}
+          title="Marcar partido por doble de puntos"
+        >
+          x2
+        </button>
       )}
 
       {/* Header Info */}
