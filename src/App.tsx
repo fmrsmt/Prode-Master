@@ -257,7 +257,7 @@ export default function App() {
       <main className="max-w-4xl mx-auto px-6 py-10">
         
         {activeTabId === 'RANKING' && (
-           <ProdeComparison prodes={prodes} actualScores={actualScores} matches={INITIAL_FIXTURE} />
+           <ProdeComparison prodes={prodes} actualScores={actualScores} matches={INITIAL_FIXTURE} oddsData={oddsData} />
         )}
 
         {activeTabId === 'ODDS' && (

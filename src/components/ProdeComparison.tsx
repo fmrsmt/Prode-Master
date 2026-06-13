@@ -1,19 +1,21 @@
 import React from 'react';
 import { Target, Trophy, CheckCircle2, LayoutList } from 'lucide-react';
-import { Prode, ActualScores, Match } from '../types';
-import { calculateMatchPoints } from '../utils';
+import { Prode, ActualScores, Match, HouseOdds } from '../types';
+import { calculateMatchPoints, calculateTopPredictions } from '../utils';
 
 type Props = {
   prodes: Prode[];
   actualScores: ActualScores;
   matches: Match[];
+  oddsData: Record<string, HouseOdds[]>;
 };
 
-export default function ProdeComparison({ prodes, actualScores, matches }: Props) {
+export default function ProdeComparison({ prodes, actualScores, matches, oddsData }: Props) {
   const stats = prodes.map(prode => {
     let pts = 0;
     let exacts = 0;
     let partials = 0;
+    let totalEV = 0;
     
     matches.forEach(m => {
         const pred = prode.predictions[m.id];
@@ -22,15 +24,25 @@ export default function ProdeComparison({ prodes, actualScores, matches }: Props
             const exactPoints = prode.config?.exactPoints ?? 3;
             const partialPoints = prode.config?.partialPoints ?? 1;
             const multiplier = prode.multipliers?.[m.id] ?? 1;
+            const riskMode = prode.config?.riskMode ?? 'normal';
 
             const pt = calculateMatchPoints(actual.a, actual.b, pred.a, pred.b, exactPoints, partialPoints, multiplier);
             pts += pt;
             if (pt === exactPoints * multiplier && pt > 0) exacts++;
             else if (pt === partialPoints * multiplier && pt > 0) partials++;
+
+            const odds = oddsData[m.id] || [];
+            if (odds.length > 0) {
+               const predictions = calculateTopPredictions(odds, undefined, -1, exactPoints, partialPoints, riskMode);
+               const matchPredEV = predictions.find(p => p.scoreA === pred.a && p.scoreB === pred.b);
+               if (matchPredEV) {
+                  totalEV += parseFloat(matchPredEV.expectedPoints) * multiplier;
+               }
+            }
         }
     });
 
-    return { ...prode, pts, exacts, partials };
+    return { ...prode, pts, exacts, partials, totalEV };
   }).sort((a, b) => b.pts - a.pts);
 
   return (
@@ -54,7 +66,7 @@ export default function ProdeComparison({ prodes, actualScores, matches }: Props
                 <th className="py-4 px-6 font-bold text-slate-400 text-xs uppercase tracking-widest">Nombre</th>
                 <th className="py-4 px-6 font-bold text-slate-400 text-xs uppercase tracking-widest text-center">Exactos (3pts)</th>
                 <th className="py-4 px-6 font-bold text-slate-400 text-xs uppercase tracking-widest text-center">Parciales (1pt)</th>
-                <th className="py-4 px-6 font-bold text-blue-600 text-xs uppercase tracking-widest text-right">Puntaje EV</th>
+                <th className="py-4 px-6 font-bold text-blue-600 text-xs uppercase tracking-widest text-right">Puntaje (EV)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -75,7 +87,10 @@ export default function ProdeComparison({ prodes, actualScores, matches }: Props
                     <span className="font-mono font-bold text-slate-500">{stat.partials}</span>
                   </td>
                   <td className="py-4 px-6 text-right">
-                    <span className="text-2xl font-black font-mono text-slate-800">{stat.pts}</span>
+                    <div className="flex flex-col items-end justify-center">
+                       <span className="text-2xl font-black font-mono text-slate-800">{stat.pts}</span>
+                       <span className="text-xs font-bold text-emerald-600 font-mono">EV: {stat.totalEV.toFixed(2)}</span>
+                    </div>
                   </td>
                 </tr>
               ))}
