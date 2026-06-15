@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Target, TrendingUp, DollarSign, Upload, Loader2, AlertCircle, BarChart2 } from 'lucide-react';
-import { Match, HouseOdds } from '../types';
+import { Match, HouseOdds, ActualScores } from '../types';
 import OddsModal from './OddsModal';
 import { calculateTopPredictions } from '../utils';
 
@@ -9,9 +9,10 @@ type Props = {
   oddsData: Record<string, HouseOdds[]>;
   onUpdateOdds: (matchId: string, houses: HouseOdds[]) => void;
   onBulkUpdateOdds?: (data: Record<string, HouseOdds[]>) => void;
+  actualScores: ActualScores;
 };
 
-export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpdateOdds }: Props) {
+export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpdateOdds, actualScores }: Props) {
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errorStr, setErrorStr] = useState<string | null>(null);
@@ -140,6 +141,9 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
 
     const allEVList: GlobalEVResult[] = [];
     matches.forEach(m => {
+      const hasResult = actualScores[m.id] && actualScores[m.id].a !== null && actualScores[m.id].b !== null;
+      if (hasResult) return;
+
       const houses = oddsData[m.id] || [];
       if (houses.length > 0) {
         // limit = 0 to get all calculated predictions for the match, or just 10, doesn't matter too much, we just need top results
@@ -159,7 +163,7 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
 
     allEVList.sort((a, b) => parseFloat(b.expectedPoints) - parseFloat(a.expectedPoints));
     return allEVList.slice(0, 20); // Top 20 best global results
-  }, [matches, oddsData]);
+  }, [matches, oddsData, actualScores]);
 
   return (
     <div 
@@ -213,13 +217,20 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
         )}
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {matches.map(match => {
+          {[...matches].sort((a, b) => {
+            const aHasResult = actualScores[a.id] && actualScores[a.id].a !== null && actualScores[a.id].b !== null;
+            const bHasResult = actualScores[b.id] && actualScores[b.id].a !== null && actualScores[b.id].b !== null;
+            if (aHasResult && !bHasResult) return 1;
+            if (!aHasResult && bHasResult) return -1;
+            return 0;
+          }).map(match => {
             const housesLoaded = oddsData[match.id] || [];
+            const hasResult = actualScores[match.id] && actualScores[match.id].a !== null && actualScores[match.id].b !== null;
             return (
               <div 
                 key={match.id} 
                 onClick={() => setEditingMatch(match)}
-                className="border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-blue-300 transition-colors p-4 rounded-xl cursor-pointer flex flex-col gap-3 group"
+                className={`border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-blue-300 transition-colors p-4 rounded-xl cursor-pointer flex flex-col gap-3 group ${hasResult ? 'opacity-50' : ''}`}
               >
                 <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{match.stage}</span>
@@ -227,7 +238,11 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
                 </div>
                 <div className="flex items-center justify-between font-bold text-slate-800">
                   <span className="truncate">{match.teamA}</span>
-                  <span className="text-slate-400 mx-2 text-xs">vs</span>
+                  {hasResult ? (
+                    <span className="text-emerald-600 font-black mx-2 text-sm">{actualScores[match.id].a} - {actualScores[match.id].b}</span>
+                  ) : (
+                    <span className="text-slate-400 mx-2 text-xs">vs</span>
+                  )}
                   <span className="truncate">{match.teamB}</span>
                 </div>
                 {housesLoaded.length > 0 && (

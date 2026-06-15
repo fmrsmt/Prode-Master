@@ -266,6 +266,7 @@ export default function App() {
               oddsData={oddsData} 
               onUpdateOdds={(id, h) => setOddsData({...oddsData, [id]: h})}
               onBulkUpdateOdds={(data) => setOddsData({ ...oddsData, ...data })}
+              actualScores={actualScores}
            />
         )}
 
