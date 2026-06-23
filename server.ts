@@ -4,13 +4,17 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import multer from "multer";
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 } // 20 MB limit
+});
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   app.post("/api/parse-odds", upload.single("image"), async (req, res) => {
     try {
@@ -67,6 +71,14 @@ No devuelvas texto adicional ni formato markdown. Solo el JSON. Usa tu mejor est
     } catch (err: any) {
       console.error(err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.path.startsWith('/api/')) {
+      res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+    } else {
+      next(err);
     }
   });
 
