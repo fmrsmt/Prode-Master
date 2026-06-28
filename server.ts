@@ -2,12 +2,6 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import multer from "multer";
-
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 } // 20 MB limit
-});
 
 async function startServer() {
   const app = express();
@@ -16,9 +10,9 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  app.post("/api/parse-odds", upload.single("image"), async (req, res) => {
+  app.post("/api/parse-odds", async (req, res) => {
     try {
-      if (!req.file) {
+      if (!req.body || !req.body.image) {
         return res.status(400).json({ error: "No image uploaded" });
       }
 
@@ -26,7 +20,7 @@ async function startServer() {
          return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
       }
       
-      const { matches } = req.body;
+      const { matches, image, mimeType } = req.body;
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
@@ -38,8 +32,8 @@ async function startServer() {
             parts: [
               {
                 inlineData: {
-                  data: req.file.buffer.toString("base64"),
-                  mimeType: req.file.mimetype,
+                  data: image,
+                  mimeType: mimeType || "image/jpeg",
                 },
               },
               {

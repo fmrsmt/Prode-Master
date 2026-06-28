@@ -20,6 +20,9 @@ export interface ProdeConfig {
   exactPoints: number;
   partialPoints: number;
   riskMode?: 'conservative' | 'normal' | 'risky';
+  evaluationMinutes?: 90 | 120;
+  adjustOddsTo120?: boolean;
+  drawReductionFactor?: number; // percentage reduction, e.g. 30 for 30%
 }
 
 export type Prode = {

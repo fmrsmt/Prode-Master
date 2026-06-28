@@ -33,7 +33,20 @@ export default function ProdeComparison({ prodes, actualScores, matches, oddsDat
 
             const odds = oddsData[m.id] || [];
             if (odds.length > 0) {
-               const predictions = calculateTopPredictions(odds, undefined, -1, exactPoints, partialPoints, riskMode);
+               const isSecondRound = m.stage === 'Segunda Ronda';
+               const adjustOddsTo120 = prode.config?.adjustOddsTo120 ?? true;
+               const drawReductionFactor = prode.config?.drawReductionFactor ?? 30;
+               const predictions = calculateTopPredictions(
+                  odds, 
+                  undefined, 
+                  -1, 
+                  exactPoints, 
+                  partialPoints, 
+                  riskMode,
+                  isSecondRound,
+                  adjustOddsTo120,
+                  drawReductionFactor
+               );
                const matchPredEV = predictions.find(p => p.scoreA === pred.a && p.scoreB === pred.b);
                if (matchPredEV) {
                   totalEV += parseFloat(matchPredEV.expectedPoints) * multiplier;

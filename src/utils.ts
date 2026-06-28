@@ -6,13 +6,41 @@ export const COMMON_SCORES = [
   {a: 0, b: 1}, {a: 0, b: 2}, {a: 1, b: 2}, {a: 0, b: 3}, {a: 1, b: 3}, {a: 2, b: 3}
 ];
 
+export function adjust1X2OddsTo120(
+  odds1: number, 
+  oddsX: number, 
+  odds2: number, 
+  drawReductionFactorPercentage: number = 30
+): { odds1: number; oddsX: number; odds2: number } {
+  const p1 = 1 / odds1;
+  const pX = 1 / oddsX;
+  const p2 = 1 / odds2;
+  
+  const factor = drawReductionFactorPercentage / 100;
+  const pX_adj = pX * (1 - factor);
+  const diff = pX - pX_adj;
+  
+  const sum12 = p1 + p2;
+  const p1_adj = sum12 > 0 ? p1 + diff * (p1 / sum12) : p1 + diff / 2;
+  const p2_adj = sum12 > 0 ? p2 + diff * (p2 / sum12) : p2 + diff / 2;
+  
+  return {
+    odds1: 1 / p1_adj,
+    oddsX: 1 / pX_adj,
+    odds2: 1 / p2_adj
+  };
+}
+
 export function calculateTopPredictions(
   houses: HouseOdds[], 
   houseIdFilter?: string, 
   limit: number = 3,
   exactPoints: number = 3,
   partialPoints: number = 1,
-  riskMode: 'conservative' | 'normal' | 'risky' = 'normal'
+  riskMode: 'conservative' | 'normal' | 'risky' = 'normal',
+  isSecondRound: boolean = false,
+  adjustOddsTo120: boolean = false,
+  drawReductionFactor: number = 30
 ) {
   const activeHouses = houseIdFilter && houseIdFilter !== 'ALL'
     ? houses.filter(h => h.id === houseIdFilter)
@@ -20,13 +48,50 @@ export function calculateTopPredictions(
 
   if (activeHouses.length === 0) return [];
 
+  // Pre-process active houses to apply 120-minute adjustment if active, and auto-populate scores if missing
+  const processedHouses = activeHouses.map(house => {
+    let o1 = typeof house.odds1 === 'string' ? parseFloat(house.odds1.replace(',', '.')) : (house.odds1 as number | undefined);
+    let oX = typeof house.oddsX === 'string' ? parseFloat(house.oddsX.replace(',', '.')) : (house.oddsX as number | undefined);
+    let o2 = typeof house.odds2 === 'string' ? parseFloat(house.odds2.replace(',', '.')) : (house.odds2 as number | undefined);
+
+    // Apply 120-minute adjustment if it's a second round match and adjustment is enabled
+    if (isSecondRound && adjustOddsTo120 && o1 && oX && o2 && !Number.isNaN(o1) && !Number.isNaN(oX) && !Number.isNaN(o2)) {
+      const adjusted = adjust1X2OddsTo120(o1, oX, o2, drawReductionFactor);
+      o1 = adjusted.odds1;
+      oX = adjusted.oddsX;
+      o2 = adjusted.odds2;
+    }
+
+    // Populate exact scores if they are missing but we have 1X2 odds
+    let scores = { ...house.scores };
+    const hasAnyScore = Object.keys(scores).some(k => {
+      const val = scores[k];
+      return val !== undefined && val !== null && val !== '';
+    });
+
+    if (!hasAnyScore && o1 && oX && o2 && !Number.isNaN(o1) && !Number.isNaN(oX) && !Number.isNaN(o2)) {
+      scores = map1X2ToExactOdds(o1, oX, o2);
+    } else if (isSecondRound && adjustOddsTo120 && hasAnyScore && o1 && oX && o2 && !Number.isNaN(o1) && !Number.isNaN(oX) && !Number.isNaN(o2)) {
+      // If we have manual scores but we need to adjust them to 120, we regenerate them from the adjusted 1X2 odds
+      scores = map1X2ToExactOdds(o1, oX, o2);
+    }
+
+    return {
+      ...house,
+      odds1: (o1 === undefined || Number.isNaN(o1)) ? undefined : o1,
+      oddsX: (oX === undefined || Number.isNaN(oX)) ? undefined : oX,
+      odds2: (o2 === undefined || Number.isNaN(o2)) ? undefined : o2,
+      scores
+    };
+  });
+
   const avgProbs: Record<string, number> = {};
 
   COMMON_SCORES.forEach(({a, b}) => {
     const key = `${a}-${b}`;
     let probSum = 0;
     let count = 0;
-    activeHouses.forEach(house => {
+    processedHouses.forEach(house => {
         const oddVal = house.scores[key];
         const odd = typeof oddVal === 'string' ? parseFloat(oddVal.replace(',', '.')) : oddVal;
         if (odd && odd > 1) {
@@ -47,10 +112,10 @@ export function calculateTopPredictions(
   let probXSum = 0; let probXCount = 0;
   let prob2Sum = 0; let prob2Count = 0;
 
-  activeHouses.forEach(house => {
-      const o1 = typeof house.odds1 === 'string' ? parseFloat(house.odds1.replace(',', '.')) : (house.odds1 as number | undefined);
-      const oX = typeof house.oddsX === 'string' ? parseFloat(house.oddsX.replace(',', '.')) : (house.oddsX as number | undefined);
-      const o2 = typeof house.odds2 === 'string' ? parseFloat(house.odds2.replace(',', '.')) : (house.odds2 as number | undefined);
+  processedHouses.forEach(house => {
+      const o1 = house.odds1;
+      const oX = house.oddsX;
+      const o2 = house.odds2;
       
       if (o1 && !Number.isNaN(o1)) { prob1Sum += 1 / o1; prob1Count++; }
       if (oX && !Number.isNaN(oX)) { probXSum += 1 / oX; probXCount++; }

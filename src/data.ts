@@ -108,3 +108,40 @@ export const INITIAL_FIXTURE: Match[] = rawData
           formattedDate,
       };
 });
+
+const secondRoundRawData = [
+  {id: 101, ta: 'Sudáfrica', tb: 'Canadá', d: '2026-06-28T16:00:00'},
+  {id: 102, ta: 'Brasil', tb: 'Japón', d: '2026-06-29T14:00:00'},
+  {id: 103, ta: 'Alemania', tb: 'Paraguay', d: '2026-06-29T17:30:00'},
+  {id: 104, ta: 'Países Bajos', tb: 'Marruecos', d: '2026-06-29T22:00:00'},
+  {id: 105, ta: 'Costa de Marfil', tb: 'Noruega', d: '2026-06-30T14:00:00'},
+  {id: 106, ta: 'Francia', tb: 'Suecia', d: '2026-06-30T18:00:00'},
+  {id: 107, ta: 'México', tb: 'Ecuador', d: '2026-06-30T22:00:00'},
+  {id: 108, ta: 'Inglaterra', tb: 'RD Congo', d: '2026-07-01T13:00:00'},
+  {id: 109, ta: 'Bélgica', tb: 'Senegal', d: '2026-07-01T17:00:00'},
+  {id: 110, ta: 'Estados Unidos', tb: 'Bosnia y Herzegovina', d: '2026-07-01T21:00:00'},
+  {id: 111, ta: 'España', tb: 'Austria', d: '2026-07-02T16:00:00'},
+  {id: 112, ta: 'Portugal', tb: 'Croacia', d: '2026-07-02T20:00:00'},
+  {id: 113, ta: 'Suiza', tb: 'Argelia', d: '2026-07-03T00:00:00'},
+  {id: 114, ta: 'Australia', tb: 'Egipto', d: '2026-07-03T15:00:00'},
+  {id: 115, ta: 'Argentina', tb: 'Cabo Verde', d: '2026-07-03T19:00:00'},
+  {id: 116, ta: 'Colombia', tb: 'Ghana', d: '2026-07-03T22:30:00'},
+];
+
+export const SECOND_ROUND_FIXTURE: Match[] = secondRoundRawData
+  .sort((a, b) => a.d.localeCompare(b.d))
+  .map(m => {
+      const year = parseInt(m.d.substring(0, 4));
+      const month = parseInt(m.d.substring(5, 7)) - 1;
+      const day = parseInt(m.d.substring(8, 10));
+      const hour = m.d.substring(11, 16); // "HH:mm"
+      const formattedDate = `${day} ${months[month]} ${hour}`;
+      return {
+          id: m.id.toString(),
+          stage: 'Segunda Ronda',
+          teamA: m.ta,
+          teamB: m.tb,
+          datetime: m.d,
+          formattedDate,
+      };
+  });

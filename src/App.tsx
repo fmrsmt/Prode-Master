@@ -5,8 +5,10 @@
 
 import { useState, useEffect } from 'react';
 import { Target, Trophy, Plus, Settings2, BarChart3, ListChecks, DollarSign, Target as TargetIcon } from 'lucide-react';
-import { INITIAL_FIXTURE } from './data';
+import { INITIAL_FIXTURE, SECOND_ROUND_FIXTURE } from './data';
 import { Match, Prode, ActualScores, HouseOdds } from './types';
+
+const ALL_MATCHES = [...INITIAL_FIXTURE, ...SECOND_ROUND_FIXTURE];
 import MatchCard from './components/MatchCard';
 import OddsManager from './components/OddsManager';
 import ProdeComparison from './components/ProdeComparison';
@@ -48,6 +50,7 @@ export default function App() {
   const [oddsData, setOddsData] = useState<Record<string, HouseOdds[]>>({});
   
   const [activeTabId, setActiveTabId] = useState<string>('RESULTS'); // 'RESULTS', 'ODDS', 'RANKING' or Prode ID
+  const [selectedStage, setSelectedStage] = useState<'GRUPO' | 'SEGUNDA'>('GRUPO');
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -98,11 +101,19 @@ export default function App() {
 
   const activeProde = prodes.find(p => p.id === activeTabId);
 
+  const filteredMatches = ALL_MATCHES.filter(m => {
+    if (selectedStage === 'GRUPO') {
+      return m.stage !== 'Segunda Ronda';
+    } else {
+      return m.stage === 'Segunda Ronda';
+    }
+  });
+
   // Calc score for active prode
   let totalPoints = 0;
   let hitsExact = 0;
   if (activeProde) {
-    INITIAL_FIXTURE.forEach(m => {
+    ALL_MATCHES.forEach(m => {
         const pred = activeProde.predictions[m.id];
         const actual = actualScores[m.id];
         if (pred && actual && actual.a !== null && actual.b !== null && pred.a !== null && pred.b !== null) {
@@ -257,12 +268,12 @@ export default function App() {
       <main className="max-w-4xl mx-auto px-6 py-10">
         
         {activeTabId === 'RANKING' && (
-           <ProdeComparison prodes={prodes} actualScores={actualScores} matches={INITIAL_FIXTURE} oddsData={oddsData} />
+           <ProdeComparison prodes={prodes} actualScores={actualScores} matches={ALL_MATCHES} oddsData={oddsData} />
         )}
 
         {activeTabId === 'ODDS' && (
            <OddsManager 
-              matches={INITIAL_FIXTURE} 
+              matches={ALL_MATCHES} 
               oddsData={oddsData} 
               onUpdateOdds={(id, h) => setOddsData({...oddsData, [id]: h})}
               onBulkUpdateOdds={(data) => setOddsData({ ...oddsData, ...data })}
@@ -273,31 +284,59 @@ export default function App() {
         {/* View para Resultados y Carga de Prodes */}
         {(activeTabId === 'RESULTS' || activeProde) && (
             <div className="flex flex-col gap-6">
+              {/* Stage Selector Tabs */}
+              <div className="flex border-b border-slate-200 gap-4 mb-2">
+                <button 
+                  onClick={() => setSelectedStage('GRUPO')}
+                  className={`pb-2 text-sm font-bold border-b-2 transition-all ${
+                    selectedStage === 'GRUPO' 
+                      ? 'border-blue-600 text-blue-600 font-extrabold' 
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Fase de Grupos
+                </button>
+                <button 
+                  onClick={() => setSelectedStage('SEGUNDA')}
+                  className={`pb-2 text-sm font-bold border-b-2 transition-all ${
+                    selectedStage === 'SEGUNDA' 
+                      ? 'border-blue-600 text-blue-600 font-extrabold' 
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Segunda Ronda
+                </button>
+              </div>
+
               {activeProde && (
-                <div className="flex flex-col gap-3 w-full max-w-sm mb-4">
-                    <input 
-                      type="text" 
-                      value={activeProde.name}
-                      onChange={(e) => {
-                         setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, name: e.target.value } : p));
-                      }}
-                      className="w-full px-4 py-2 border-b-2 border-slate-200 hover:border-slate-300 focus:border-blue-500 bg-transparent outline-none text-xl font-bold text-slate-800 transition-colors"
-                      placeholder="Nombre del Prode"
-                    />
-                    <div className="flex flex-wrap items-center gap-4 px-4">
+                <div className="flex flex-col gap-4 w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nombre del Prode</label>
+                      <input 
+                        type="text" 
+                        value={activeProde.name}
+                        onChange={(e) => {
+                           setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, name: e.target.value } : p));
+                        }}
+                        className="w-full max-w-md px-3 py-1.5 border-b-2 border-slate-200 hover:border-slate-300 focus:border-blue-500 bg-transparent outline-none text-lg font-bold text-slate-800 transition-colors"
+                        placeholder="Nombre del Prode"
+                      />
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-4 pt-2 border-t border-slate-200/60">
                         <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
                            Puntos Exacto: 
                            <input type="number" min="0" value={activeProde.config?.exactPoints ?? 3} onChange={(e) => {
                                const val = parseInt(e.target.value) || 0;
                                setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), exactPoints: val } } : p));
-                           }} className="w-14 text-center border border-slate-200 rounded-md py-1 bg-white focus:outline-none focus:border-blue-500 text-slate-800" />
+                           }} className="w-14 text-center border border-slate-200 rounded-md py-1.5 bg-white focus:outline-none focus:border-blue-500 text-slate-800 font-bold" />
                         </label>
                         <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
                            Puntos Parcial: 
                            <input type="number" min="0" value={activeProde.config?.partialPoints ?? 1} onChange={(e) => {
                                const val = parseInt(e.target.value) || 0;
                                setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), partialPoints: val } } : p));
-                           }} className="w-14 text-center border border-slate-200 rounded-md py-1 bg-white focus:outline-none focus:border-blue-500 text-slate-800" />
+                           }} className="w-14 text-center border border-slate-200 rounded-md py-1.5 bg-white focus:outline-none focus:border-blue-500 text-slate-800 font-bold" />
                         </label>
                         <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
                            Riesgo EV: 
@@ -307,18 +346,66 @@ export default function App() {
                                    const val = e.target.value as 'conservative' | 'normal' | 'risky';
                                    setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), riskMode: val } } : p));
                                }}
-                               className="border border-slate-200 rounded-md py-1 px-2 bg-white focus:outline-none focus:border-blue-500 text-slate-800"
+                               className="border border-slate-200 rounded-md py-1.5 px-2 bg-white focus:outline-none focus:border-blue-500 text-slate-800 font-semibold"
                            >
                                <option value="conservative">Conservador</option>
                                <option value="normal">Normal</option>
                                <option value="risky">Arriesgado</option>
                            </select>
                         </label>
+                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                           Evaluar partidos en: 
+                           <select 
+                               value={activeProde.config?.evaluationMinutes ?? 120}
+                               onChange={(e) => {
+                                   const val = parseInt(e.target.value) as 90 | 120;
+                                   setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), evaluationMinutes: val } } : p));
+                               }}
+                               className="border border-slate-200 rounded-md py-1.5 px-2 bg-white focus:outline-none focus:border-blue-500 text-slate-800 font-semibold"
+                           >
+                               <option value={120}>120 Min (con alargue)</option>
+                               <option value={90}>90 Min (reglamentario)</option>
+                           </select>
+                        </label>
+
+                        {(activeProde.config?.evaluationMinutes ?? 120) === 120 && (
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 w-full pt-1">
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer">
+                               <input 
+                                   type="checkbox"
+                                   checked={activeProde.config?.adjustOddsTo120 ?? true}
+                                   onChange={(e) => {
+                                       const val = e.target.checked;
+                                       setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), adjustOddsTo120: val } } : p));
+                                   }}
+                                   className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                               />
+                               Corregir Cuotas 90' a 120'
+                            </label>
+                            {(activeProde.config?.adjustOddsTo120 ?? true) && (
+                              <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                 Reducción Prob. Empate: 
+                                 <input 
+                                     type="number" 
+                                     min="0" 
+                                     max="100"
+                                     value={activeProde.config?.drawReductionFactor ?? 30} 
+                                     onChange={(e) => {
+                                         const val = parseInt(e.target.value) || 0;
+                                         setProdes(prodes.map(p => p.id === activeProde.id ? { ...p, config: { ...(p.config || { exactPoints: 3, partialPoints: 1 }), drawReductionFactor: val } } : p));
+                                     }} 
+                                     className="w-14 text-center border border-slate-200 rounded-md py-1.5 bg-white focus:outline-none focus:border-blue-500 text-slate-800 font-bold" 
+                                 />
+                                 %
+                              </label>
+                            )}
+                          </div>
+                        )}
                     </div>
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {INITIAL_FIXTURE.map((match) => {
+              {filteredMatches.map((match) => {
                   const actual = actualScores[match.id] || { a: null, b: null };
                   const pred = activeProde ? activeProde.predictions[match.id] || { a: null, b: null } : { a: null, b: null };
                   const odds = oddsData[match.id] || [];
@@ -340,6 +427,8 @@ export default function App() {
                           multiplier={activeProde?.multipliers?.[match.id] ?? 1}
                           onToggleMultiplier={() => handleToggleMultiplier(match.id)}
                           riskMode={activeProde?.config?.riskMode || 'normal'}
+                          adjustOddsTo120={activeProde?.config?.adjustOddsTo120 ?? true}
+                          drawReductionFactor={activeProde?.config?.drawReductionFactor ?? 30}
                       />
                   );
               })}

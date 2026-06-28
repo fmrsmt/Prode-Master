@@ -19,6 +19,17 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
   const [successStr, setSuccessStr] = useState<string | null>(null);
   const [houseNameInput, setHouseNameInput] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedStage, setSelectedStage] = useState<'GRUPO' | 'SEGUNDA'>('GRUPO');
+
+  const filteredMatches = useMemo(() => {
+    return matches.filter(m => {
+      if (selectedStage === 'GRUPO') {
+        return m.stage !== 'Segunda Ronda';
+      } else {
+        return m.stage === 'Segunda Ronda';
+      }
+    });
+  }, [matches, selectedStage]);
 
   const compressImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
@@ -65,15 +76,31 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
     try {
       const compressedBlob = await compressImage(file);
       
-      const formData = new FormData();
-      formData.append('image', compressedBlob, 'image.jpg');
+      // Convert blob to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          // Extract only the base64 part, remove data:image/jpeg;base64,
+          const base64 = base64data.split(',')[1];
+          resolve(base64);
+        };
+      });
+      reader.readAsDataURL(compressedBlob);
+      const base64Image = await base64Promise;
       
       const payloadMatches = matches.map(m => ({ id: m.id, teamA: m.teamA, teamB: m.teamB }));
-      formData.append('matches', JSON.stringify(payloadMatches));
-
+      
       const response = await fetch('/api/parse-odds', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: base64Image,
+          mimeType: 'image/jpeg',
+          matches: JSON.stringify(payloadMatches)
+        }),
       });
 
       if (!response.ok) {
@@ -268,8 +295,32 @@ export default function OddsManager({ matches, oddsData, onUpdateOdds, onBulkUpd
           </div>
         )}
 
+        {/* Sub-tabs for Stage selection */}
+        <div className="mx-6 mt-6 flex border-b border-slate-200 gap-4">
+          <button 
+            onClick={() => setSelectedStage('GRUPO')}
+            className={`pb-2 text-sm font-bold border-b-2 transition-all ${
+              selectedStage === 'GRUPO' 
+                ? 'border-blue-600 text-blue-600' 
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Fase de Grupos
+          </button>
+          <button 
+            onClick={() => setSelectedStage('SEGUNDA')}
+            className={`pb-2 text-sm font-bold border-b-2 transition-all ${
+              selectedStage === 'SEGUNDA' 
+                ? 'border-blue-600 text-blue-600' 
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Segunda Ronda
+          </button>
+        </div>
+
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...matches].sort((a, b) => {
+          {[...filteredMatches].sort((a, b) => {
             const aHasResult = actualScores[a.id] && actualScores[a.id].a !== null && actualScores[a.id].b !== null;
             const bHasResult = actualScores[b.id] && actualScores[b.id].a !== null && actualScores[b.id].b !== null;
             if (aHasResult && !bHasResult) return 1;

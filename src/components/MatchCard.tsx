@@ -20,13 +20,15 @@ type Props = {
   multiplier?: number;
   onToggleMultiplier?: () => void;
   riskMode?: 'conservative' | 'normal' | 'risky';
+  adjustOddsTo120?: boolean;
+  drawReductionFactor?: number;
 };
 
 export default function MatchCard({ 
   match, actualScoreA, actualScoreB, predictedScoreA, predictedScoreB, 
   oddsData, onUpdateActual, onUpdatePrediction, mode, 
   exactPoints = 3, partialPoints = 1, multiplier = 1, onToggleMultiplier,
-  riskMode = 'normal'
+  riskMode = 'normal', adjustOddsTo120 = true, drawReductionFactor = 30
 }: Props) {
   const [selectedHouse, setSelectedHouse] = useState<string>('ALL');
 
@@ -40,7 +42,18 @@ export default function MatchCard({
   };
 
   const hasOdds = oddsData && oddsData.length > 0;
-  const topPredictions = hasOdds ? calculateTopPredictions(oddsData, selectedHouse, 3, exactPoints, partialPoints, riskMode) : [];
+  const isSecondRound = match.stage === 'Segunda Ronda';
+  const topPredictions = hasOdds ? calculateTopPredictions(
+    oddsData, 
+    selectedHouse, 
+    3, 
+    exactPoints, 
+    partialPoints, 
+    riskMode,
+    isSecondRound,
+    adjustOddsTo120,
+    drawReductionFactor
+  ) : [];
 
   return (
     <div className={`bg-white border hover:border-blue-300 shadow-sm hover:shadow-md transition-all rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden group ${multiplier === 2 ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
@@ -143,6 +156,17 @@ export default function MatchCard({
                           </select>
                         </div>
                     </div>
+
+                    {isSecondRound && adjustOddsTo120 && (
+                      <div className="mb-3 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex flex-col gap-0.5 font-medium leading-normal">
+                        <span className="font-bold flex items-center gap-1 text-amber-800">
+                          ⚡ Ajuste de Alargue Activo (120 min)
+                        </span>
+                        <span>
+                          Las cuotas de 90 min se corrigieron a 120 min, disminuyendo la probabilidad de empate un {drawReductionFactor}% y redistribuyendo a victoria.
+                        </span>
+                      </div>
+                    )}
                     
                     <div className="flex flex-col gap-2">
                         {topPredictions.map((tp, idx) => (
